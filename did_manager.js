@@ -5,8 +5,35 @@ const axios = require('axios')
 
 const log = console.log
 
+let trustAnchorDid = ''
+let trustAnchorVerkey = ''
+let poolHandle = ''
+let walletHandle = ''
+
 function logValue() {
     log(colors.CYAN, ...arguments, colors.NONE)
+}
+
+
+
+// 출입증 발급을 위한 스키마(Schema) 생성
+async function makeSchema(){
+    
+    enterancePass = {
+        'name': 'enterancePass',
+        'version': '1.0',
+        'attributes': ['firstName', 'lastName', 'passLevel']
+    }
+    const [id, schema] = await indy.issuerCreateSchema(trustAnchorDid, 'enterancePass', '1.0', ['firstName', 'lastName', 'passLevel'])
+    log(id, schema)
+    
+    log('스키마 등록 요청 생성...')
+    const schemaRequest= await indy.buildSchemaRequest(trustAnchorDid, schema)
+    log('스키마 등록 요청 성공...')
+    
+    const requestResult = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, schemaRequest)
+    console.log(requestResult)
+    
 }
 
 async function run(){
@@ -21,7 +48,7 @@ async function run(){
     await indy.setProtocolVersion(2)
     
     log('2. Open pool ledger and get handle from libindy')
-    const poolHandle = await indy.openPoolLedger(poolName, undefined)
+    poolHandle = await indy.openPoolLedger(poolName, undefined)
 
     // 3.
     log('3. Creating new secure wallet')
@@ -31,12 +58,15 @@ async function run(){
 
     // 4.
     log('4. Open wallet and get handle from libindy')
-    const walletHandle = await indy.openWallet(walletName, walletCredentials)
+    walletHandle = await indy.openWallet(walletName, walletCredentials)
 
     log('6. Generating and storing trust anchor DID and verkey')
     // const didManagerSeed = 'DidManager'
     // const did = {'seed': didManagerSeed}
-    const [trustAnchorDid, trustAnchorVerkey] = await indy.createAndStoreMyDid(walletHandle, "{}")
+    const [_trustAnchorDid, _trustAnchorVerkey] = await indy.createAndStoreMyDid(walletHandle, "{}")
+    trustAnchorDid = _trustAnchorDid
+    trustAnchorVerkey = _trustAnchorVerkey
+
     logValue('Trust anchor DID: ', trustAnchorDid)
     logValue('Trust anchor Verkey: ', trustAnchorVerkey)
     
@@ -45,7 +75,6 @@ async function run(){
     
     result = await axios.post('http://localhost:3000/request_endorser',  data)
     console.log(result.status)
-
 }
 
-module.exports = {run}
+module.exports = {run, makeSchema}
