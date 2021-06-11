@@ -10,19 +10,19 @@ app.set('views', path.join(__dirname, 'views'))
 app.set('view engine', 'ejs')
 app.engine('html', require('ejs').renderFile);
 
-const {run, makeSchema, makeCredential, makeRevokeRegistry} = require('./did_manager.js')
+const didManager = require('./did_manager.js')
+const schemaManager = require('./schema_manager.js')
+
 app.get('/page', (req,res)=>{
     res.render('index.html', {name: 'kang'})
 })
 
 app.get('/', (req,res)=>{
-    // res.send('DID Manager 서버를 가동합니다')
-    run()
-    res.sendStatus(200)
+    res.send('ok')
 })
 
 app.get('/connect_indy', async(req,res)=>{
-    const [trustAnchorDid, trustAnchorVerkey] = await run()
+    const [trustAnchorDid, trustAnchorVerkey] = await didManager.getDID()
     const data = {
         msg: '블록체인 연결이 완료되었습니다',
         trustAnchorDid: trustAnchorDid,
@@ -31,6 +31,18 @@ app.get('/connect_indy', async(req,res)=>{
     console.log(data)
     res.json(data)
 })
+
+app.get('/connect_indyG', async(req,res)=>{
+    const [trustAnchorDid, trustAnchorVerkey] = await schemaManager.getDID()
+    const data = {
+        msg: '정부 블록체인 연결이 완료되었습니다',
+        trustAnchorDid: trustAnchorDid,
+        trustAnchorVerkey: trustAnchorVerkey
+    }
+    console.log(data)
+    res.json(data)
+})
+
 
 app.get('/make_schema', async (req,res)=>{
     const [id, schema] = await makeSchema()
@@ -60,9 +72,3 @@ app.get('/make_credential', async(req, res)=>{
 app.listen(port, ()=>{
     console.log(`did manager server is running at http://localhost:${port}`)
 })
-
-const sleep = ms => {
-    return new Promise(resolve => {
-        setTimeout(resolve, ms)
-    })
-}

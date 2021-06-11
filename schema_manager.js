@@ -32,8 +32,8 @@ function getDID(){
 
     // 3.
     log('3. Creating new secure wallet')
-    const walletName = {"id": "manager"}
-    const walletCredentials = {"key": "manager"}
+    const walletName = {"id": "schema_manager"}
+    const walletCredentials = {"key": "schema_manager_key"}
     await indy.createWallet(walletName, walletCredentials).catch(()=>{})
 
     // 4.

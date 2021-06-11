@@ -13,7 +13,10 @@
       <div class="d-flex justify-content-center">
         <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist" >
           <li class="nav-item" role="presentation">
-            <button class="nav-link" id="connect-indy-node" data-bs-toggle="pill" data-bs-target="#connect-indy-node-status" type="button" role="tab" aria-controls="connect-indy-node-status" aria-selected="false">블록체인 노드 연결</button>
+            <button class="nav-link" id="connect-indy-node" data-bs-toggle="pill" data-bs-target="#connect-indy-node-status" type="button" role="tab" aria-controls="connect-indy-node-status" aria-selected="false">DID 관리자 블록체인 노드 연결</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="connect-indy-nodeG" data-bs-toggle="pill" data-bs-target="#connect-indy-node-statusG" type="button" role="tab" aria-controls="connect-indy-node-statusG" aria-selected="false">정부 블록체인 노드 연결</button>
           </li>
           <li class="nav-item" role="presentation">
             <button class="nav-link" id="make-schema" data-bs-toggle="pill" data-bs-target="#make-schema-status" type="button" role="tab" aria-controls="make-schema-status" aria-selected="false">Schema 생성</button>
@@ -29,6 +32,7 @@
       <div class="d-flex justify-content-center">
         <div class="tab-content" id="pills-tabContent">
           <div class="tab-pane fade show active" id="connect-indy-node-status" role="tabpanel" aria-labelledby="connect-indy-node-status"><pre id='connect-indy-node-status-pre'>...</pre></div>
+          <div class="tab-pane fade" id="connect-indy-nodeG" role="tabpanel" aria-labelledby="connect-indy-nodeG"><pre id='connect-indy-nodeG-status-pre'>...</pre></div>
           <div class="tab-pane fade" id="make-schema-status" role="tabpanel" aria-labelledby="make-schema-status"><pre id='make-schema-status-pre'>...</pre></div>
           <div class="tab-pane fade"  id="make-credential-status" role="tabpanel" aria-labelledby="make-credential-status"><pre id="make-credential-status-pre" style="max-width: 1000px;">...</pre></div>
           <div class="tab-pane fade" id="make-revoke-registry-status" role="tabpanel" aria-labelledby="make-revoke-registry-status"><pre id='make-revoke-registry-status-pre'>...</pre></div>
@@ -37,10 +41,17 @@
     </body>
     <script>
         init()
-        let is_click = [false, false, false, false]
+        let is_click = {
+            connectIndy: false,
+            connectIndyG: false,
+            makeSchema: false,
+            makeCredential: false,
+            makeRevokeRegistry: false
+        }
         
         function init(){
             connectIndy()
+            connectIndyG()
             makeSchema()
             makeCredential()
             makeRevokeRegistry()
@@ -49,8 +60,8 @@
         function connectIndy(){
             const tab = document.querySelector('#connect-indy-node')
             tab.addEventListener('click', async (e)=>{
-                if(is_click[0]) return
-                is_click[0] = true
+                if(is_click.connectIndy) return
+                is_click.connectIndy = true
                 e.preventDefault()
                 let innerTab = document.querySelector('#connect-indy-node-status-pre')
                 innerTab.innerHTML = '블록체인 연결중...'
@@ -60,12 +71,28 @@
                 innerTab.innerHTML = JSON.stringify(res.data, null, 2)
             })
         }
+
+        function connectIndyG(){
+            
+            const tab = document.querySelector('#connect-indy-nodeG')
+            tab.addEventListener('click', async (e)=>{
+                if(is_click.connectIndyG) return
+                is_click.connectIndyG = true
+                e.preventDefault()
+                let innerTab = document.querySelector('#connect-indy-nodeG-status-pre')
+                innerTab.innerHTML = '정부가 블록체인 연결중...'
+                const res = await axios.get('http://52.231.165.205:3001/connect_indyG')
+                const {msg, trustAnchorDid, trustAnchorVerkey} = res.data
+                // innerTab.innerHTML = `상태: ${msg}<br>trustAnchorDid: ${trustAnchorDid}<br>trustAnchorVerkey: ${trustAnchorVerkey}`
+                innerTab.innerHTML = JSON.stringify(res.data, null, 2)
+            })
+        }
         
         function makeSchema(){
             const tab = document.querySelector('#make-schema')
             tab.addEventListener('click', async (e)=>{
-                if(is_click[1]) return
-                is_click[1] = true
+                if(is_click.makeSchema) return
+                is_click.makeSchema = true
                 e.preventDefault()
                 let innerTab = document.querySelector('#make-schema-status-pre')
                 innerTab.innerHTML = '출입증 Schema 생성중...'
@@ -86,8 +113,8 @@
         function makeCredential(){
             const tab = document.querySelector('#make-credential')
             tab.addEventListener('click', async (e)=>{
-                if(is_click[2]) return
-                is_click[2] = true
+                if(is_click.makeCredential) return
+                is_click.makeCredential = true
                 e.preventDefault()
                 let innerTab = document.querySelector('#make-credential-status-pre')
                 innerTab.innerHTML = '출입증 Credential 생성중...'
@@ -102,8 +129,8 @@
         function makeRevokeRegistry(){
             const tab = document.querySelector('#make-revoke-registry')
             tab.addEventListener('click', async (e)=>{
-                if(is_click[3]) return
-                is_click[3] = true
+                if(is_click.makeRevokeRegistry) return
+                is_click.makeRevokeRegistry = true
                 e.preventDefault()
                 let innerTab = document.querySelector('#make-revoke-registry-status-pre')
                 innerTab.innerHTML = '출입증 Revoke Registry 생성중...'
