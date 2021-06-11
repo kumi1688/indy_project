@@ -10,58 +10,15 @@ let trustAnchorVerkey = ''
 let poolHandle = ''
 let walletHandle = ''
 let schemaId = ''
+let credDefId = ''
 
 function logValue() {
     log(colors.CYAN, ...arguments, colors.NONE)
 }
 
-async function makeCredential(){
-    log('스키마 요청 생성...')   
-    const schemeRequest = await indy.buildGetSchemaRequest(trustAnchorDid, schemaId)
-    log('스키마 요청...')
-    const getSchemaResponse = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, schemeRequest)
-    log('스키마 요청 응답 확인...')
-    const [id, schema] = await indy.parseGetSchemaResponse(getSchemaResponse)
-    log(id, schema)
-
-    log('CredDef 생성...')
-    const [credDefId, credDef] = await indy.issuerCreateAndStoreCredentialDef(walletHandle, trustAnchorDid, schema, 'TAG1', 'CL')
-    console.log(credDef)
-    log('CredDef 등록 요청 생성...')
-
-    const credDefRequest = await indy.buildCredDefRequest(trustAnchorDid, credDef)
-    log('CredDef 블록체인에 등록 요청...')
-    const requestResult = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, credDefRequest)
-    log('CredDef 블록체인에 등록 완료...')
-    console.log(requestResult)
-}
-
-// 출입증 발급을 위한 스키마(Schema) 생성
-async function makeSchema(){   
-    enterancePass = {
-        'name': 'enterancePass',
-        'version': '1.0',
-        'attributes': ['firstName', 'lastName', 'passLevel']
-    }
-    log('스키마 생성...')
-    const [id, schema] = await indy.issuerCreateSchema(trustAnchorDid, 'enterancePass', '1.0', ['firstName', 'lastName', 'passLevel'])
-    schemaId = id
-    log(id, schema)
-    
-    log('스키마 등록 요청 생성...')
-    const schemaRequest= await indy.buildSchemaRequest(trustAnchorDid, schema)
-    log('스키마 등록 요청 성공...')
-    
-    log('스키마 블록체인 노드에 등록 요청')
-    const requestResult = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, schemaRequest)
-    if(requestResult) log('스키마 블록체인 노드에 등록 성공')
-    
-    return [id, schema]
-}
-
-async function run(){
-    
-    console.log('steward did, verkey 불러오기')
+function run(){
+    return new Promise(async (resolve, reject)=>{
+        console.log('steward did, verkey 불러오기')
     
     const response = await axios.get('http://localhost:3000')
     const {poolName, stewardDid, stewardVerkey} = response.data
@@ -98,6 +55,90 @@ async function run(){
     
     result = await axios.post('http://localhost:3000/request_endorser',  data)
     console.log(result.status)
+    resolve([trustAnchorDid, trustAnchorVerkey])
+    })
 }
 
-module.exports = {run, makeSchema, makeCredential}
+// 출입증 발급을 위한 스키마(Schema) 생성
+function makeSchema(){   
+    return new Promise(async (resolve, reject)=>{
+        enterancePass = {
+            'name': 'enterancePass',
+            'version': '1.0',
+            'attributes': ['firstName', 'lastName', 'passLevel']
+        }
+        log('스키마 생성...')
+        const [id, schema] = await indy.issuerCreateSchema(trustAnchorDid, 'enterancePass', '1.0', ['firstName', 'lastName', 'passLevel'])
+        schemaId = id
+        log(id, schema)
+        
+        log('스키마 등록 요청 생성...')
+        const schemaRequest= await indy.buildSchemaRequest(trustAnchorDid, schema)
+        log('스키마 등록 요청 성공...')
+        
+        log('스키마 블록체인 노드에 등록 요청')
+        const requestResult = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, schemaRequest)
+        if(requestResult) log('스키마 블록체인 노드에 등록 성공')
+        resolve([id, schema])
+    })
+}
+
+
+function makeCredential(){
+    log(trustAnchorDid, trustAnchorVerkey, poolHandle, walletHandle, schemaId, credDefId)
+    return new Promise(async (resolve, reject)=>{
+        log('스키마 요청 생성...')   
+        const schemeRequest = await indy.buildGetSchemaRequest(trustAnchorDid, schemaId)
+        log('스키마 요청...')
+        const getSchemaResponse = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, schemeRequest)
+        log('스키마 요청 응답 확인...')
+        
+        const [id, schema] = await indy.parseGetSchemaResponse(getSchemaResponse)
+
+        log('CredDef 생성...')
+        const [_credDefId, credDef] = await indy.issuerCreateAndStoreCredentialDef(walletHandle, trustAnchorDid, schema, 'TAG1', 'CL')
+        credDefId = _credDefId
+        log('CredDef 등록 요청 생성...')
+
+        const credDefRequest = await indy.buildCredDefRequest(trustAnchorDid, credDef)
+        log('CredDef 블록체인에 등록 요청...')
+        const requestResult = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, credDefRequest)
+        log('CredDef 블록체인에 등록 완료...')
+        resolve([credDefId, credDef])
+    })
+}
+
+function makeRevokeRegistry(){
+    return new Promise(async(resolve, reject)=>{
+        log('tails 파일 핸들러 생성')
+        const tailsWriterHandle = await indy.openBlobStorageWriter('default', {'base_dir': '/tmp/indy_tails', 'uri_pattern': ''})
+        log(tailsWriterHandle)
+        
+        log('revoc reg 생성')
+        const config = {
+            'issuance_type': 'ISSUANCE_ON_DEMAND',
+            'max_cred_num': 100
+        }
+    
+        const [revocRegId, revocRegDef, revocRegEntry] = await indy.issuerCreateAndStoreRevocReg(walletHandle, trustAnchorDid, 'CL_ACCUM', 'TAG1',  credDefId,
+         config, tailsWriterHandle)
+        log('revoc reg 블록체인 등록 요청 생성')
+        const revocRequest = await indy.buildRevocRegDefRequest(trustAnchorDid, revocRegDef)
+        log('revoc reg 블록체인에 등록 요청 실행')
+        const requestResult1 = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, revocRequest)
+        
+        log('revoc reg entry 요청 생성')
+        const revocEntryRequest = await indy.buildRevocRegEntryRequest(trustAnchorDid, revocRegId, 'CL_ACCUM', revocRegEntry)
+        log('revoc reg entry 요청 실행')
+        const requestResult2 = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, revocRequest)
+        log('revoc 등록 완료')    
+        resolve()
+    })
+}
+
+
+
+
+
+
+module.exports = {run, makeSchema, makeCredential, makeRevokeRegistry}
