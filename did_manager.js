@@ -9,31 +9,54 @@ let trustAnchorDid = ''
 let trustAnchorVerkey = ''
 let poolHandle = ''
 let walletHandle = ''
+let schemaId = ''
 
 function logValue() {
     log(colors.CYAN, ...arguments, colors.NONE)
 }
 
+async function makeCredential(){
+    log('스키마 요청 생성...')   
+    const schemeRequest = await indy.buildGetSchemaRequest(trustAnchorDid, schemaId)
+    log('스키마 요청...')
+    const getSchemaResponse = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, schemeRequest)
+    log('스키마 요청 응답 확인...')
+    const [id, schema] = await indy.parseGetSchemaResponse(getSchemaResponse)
+    log(id, schema)
 
+    log('CredDef 생성...')
+    const [credDefId, credDef] = await indy.issuerCreateAndStoreCredentialDef(walletHandle, trustAnchorDid, schema, 'TAG1', 'CL')
+    console.log(credDef)
+    log('CredDef 등록 요청 생성...')
+
+    const credDefRequest = await indy.buildCredDefRequest(trustAnchorDid, credDef)
+    log('CredDef 블록체인에 등록 요청...')
+    const requestResult = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, credDefRequest)
+    log('CredDef 블록체인에 등록 완료...')
+    console.log(requestResult)
+}
 
 // 출입증 발급을 위한 스키마(Schema) 생성
-async function makeSchema(){
-    
+async function makeSchema(){   
     enterancePass = {
         'name': 'enterancePass',
         'version': '1.0',
         'attributes': ['firstName', 'lastName', 'passLevel']
     }
+    log('스키마 생성...')
     const [id, schema] = await indy.issuerCreateSchema(trustAnchorDid, 'enterancePass', '1.0', ['firstName', 'lastName', 'passLevel'])
+    schemaId = id
     log(id, schema)
     
     log('스키마 등록 요청 생성...')
     const schemaRequest= await indy.buildSchemaRequest(trustAnchorDid, schema)
     log('스키마 등록 요청 성공...')
     
+    log('스키마 블록체인 노드에 등록 요청')
     const requestResult = await indy.signAndSubmitRequest(poolHandle, walletHandle, trustAnchorDid, schemaRequest)
-    console.log(requestResult)
+    if(requestResult) log('스키마 블록체인 노드에 등록 성공')
     
+    return [id, schema]
 }
 
 async function run(){
@@ -77,4 +100,4 @@ async function run(){
     console.log(result.status)
 }
 
-module.exports = {run, makeSchema}
+module.exports = {run, makeSchema, makeCredential}
