@@ -1,6 +1,7 @@
 const mkdirp = require('mkdirp')
 const fs = require('fs')
 const os = require('os')
+const {PythonShell}  = require('python-shell')
 
 async function getPoolGenesisTxnPath(poolName) {
     const path = `${os.tmpdir()}/indy/${poolName}.txn`
@@ -40,10 +41,24 @@ function getCurrentTimeInSeconds() {
     return Math.floor(Date.now() / 1000)
 }
 
+//https://von-agent.readthedocs.io/en/latest/_modules/von_agent/codec.html?highlight=codec
+function encode(value){
+    return new Promise((resolve, reject)=>{
+        let options = {
+            scriptPath: '.',
+            args: [value]
+        }    
+        PythonShell.run('test.py', options, (err, data)=>{
+            if(err) console.log(err)
+            resolve(data)
+        })
+    })
+}
 
 
 module.exports = {
     getPoolGenesisTxnPath,
     getPathToIndyClientHome,
-    getCurrentTimeInSeconds
+    getCurrentTimeInSeconds,
+    encode
 }

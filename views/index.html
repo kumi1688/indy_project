@@ -4,6 +4,7 @@
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" integrity="undefined" crossorigin="anonymous">
       <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.min.js" integrity="undefined" crossorigin="anonymous"></script>
       <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+      <script src="https://cdn.socket.io/3.1.3/socket.io.min.js" integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh" crossorigin="anonymous"></script>
         <title>HyperLedger Indy Test</title>
     </head>
     <body>
@@ -27,6 +28,9 @@
           <li class="nav-item" role="presentation">
             <button class="nav-link" id="make-revoke-registry" data-bs-toggle="pill" data-bs-target="#make-revoke-registry-status" type="button" role="tab" aria-controls="make-revoke-registry-status" aria-selected="false">Credential Revoke Registry 생성</button>
           </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="make-vc" data-bs-toggle="pill" data-bs-target="#make-vc-status" type="button" role="tab" aria-controls="make-vc-status" aria-selected="false">VC 생성</button>
+          </li>
         </ul>
       </div>
       <div class="d-flex justify-content-center">
@@ -36,6 +40,7 @@
           <div class="tab-pane fade" id="make-schema-status" role="tabpanel" aria-labelledby="make-schema-status"><pre id='make-schema-status-pre'>...</pre></div>
           <div class="tab-pane fade"  id="make-credential-status" role="tabpanel" aria-labelledby="make-credential-status"><pre id="make-credential-status-pre" style="max-width: 1000px;">...</pre></div>
           <div class="tab-pane fade" id="make-revoke-registry-status" role="tabpanel" aria-labelledby="make-revoke-registry-status"><pre id='make-revoke-registry-status-pre'>...</pre></div>
+          <div class="tab-pane fade" id="make-vc-status" role="tabpanel" aria-labelledby="make-vc-status"><pre id='make-vc-status-pre' style='max-width: 1000px;'>...</pre></div>
         </div>
       </div>
     </body>
@@ -46,7 +51,8 @@
             connectIndyG: false,
             makeSchema: false,
             makeCredential: false,
-            makeRevokeRegistry: false
+            makeRevokeRegistry: false,
+            makeVC: false
         }
         
         function init(){
@@ -55,6 +61,7 @@
             makeSchema()
             makeCredential()
             makeRevokeRegistry()
+            makeVC()
         }
 
         function connectIndy(){
@@ -141,10 +148,21 @@
             })
         }
 
+        function makeVC(){
+            const tab = document.querySelector('#make-vc')
+            tab.addEventListener('click', async (e)=>{
+                if(is_click.makeVC) return
+                is_click.makeVC = true
+                e.preventDefault()
+                let innerTab = document.querySelector('#make-vc-status-pre')
+                innerTab.innerHTML = '출입증 VC 생성중...'
+                const res = await axios.get('http://52.231.165.205:3001/make_enterance_VC')
+                console.log(res.data)
+                
+                innerTab.innerHTML = JSON.stringify(res.data, null, 2)
+            })
+        }
 
-    
-        
-        
     </script>
 
 </html>

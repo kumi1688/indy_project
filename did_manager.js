@@ -4,6 +4,9 @@ const colors = require('./colors')
 const axios = require('axios')
 
 const log = console.log
+const wsLog = (io, topic, msg)=>{
+    io.emit(topic, msg)
+}
 
 let trustAnchorDid = ''
 let trustAnchorVerkey = ''
@@ -16,15 +19,19 @@ function logValue() {
     log(colors.CYAN, ...arguments, colors.NONE)
 }
 
-function getDID(){
+function getDID(io){
     return new Promise(async (resolve, reject)=>{
-        console.log('steward did, verkey 불러오기')
+    const topic = 'getDID'
+        
+    
+    log('steward did, verkey 불러오기')
+    wsLog(io, topic, 'steward did, verkey 불러오기')
     
     const response = await axios.get('http://localhost:3000')
     const {poolName, stewardDid, stewardVerkey} = response.data
     logValue(poolName, stewardDid, stewardVerkey)
-
-    console.log('Indy Node 1.4 버전을 사용하기 위해 indy protocol을 2로 설정')
+    
+    log('Indy Node 1.4 버전을 사용하기 위해 indy protocol을 2로 설정')
     await indy.setProtocolVersion(2)
     
     log('2. Open pool ledger and get handle from libindy')
@@ -34,6 +41,7 @@ function getDID(){
     log('3. Creating new secure wallet')
     const walletName = {"id": "manager"}
     const walletCredentials = {"key": "manager"}
+
     await indy.createWallet(walletName, walletCredentials).catch(()=>{})
 
     // 4.
@@ -96,7 +104,7 @@ function makeCredential(){
         const [id, schema] = await indy.parseGetSchemaResponse(getSchemaResponse)
 
         log('CredDef 생성...')
-        const [_credDefId, credDef] = await indy.issuerCreateAndStoreCredentialDef(walletHandle, trustAnchorDid, schema, 'TAG1', 'CL')
+        const [_credDefId, credDef] = await indy.issuerCreateAndStoreCredentialDef(walletHandle, trustAnchorDid, schema, 'TAG1', 'CL', {supportRevocation: false})
         credDefId = _credDefId
         log('CredDef 등록 요청 생성...')
 
@@ -118,7 +126,8 @@ function makeRevokeRegistry(){
         // const [revocRegId, revocRegDef, revocRegEntry] = await indy.issuerCreateAndStoreRevocReg(walletHandle, trustAnchorDid, 'CL_ACCUM', 'TAG1',  credDefId,
         //  config, tailsWriterHandle)
         // log(walletHandle, trustAnchorDid, 'CL_ACCUM', 'TAG1',  credDefId, config, tailsWriterHandle)
-         await indy.issuerCreateAndStoreRevocReg(walletHandle, trustAnchorDid, 'CL_ACCUM', 'REG1', credDefId, {max_cred_num: 10000, issuance_type: 'ISSUANCE_ON_DEMAND'}, tailsWriterHandle)
+        const rvocRegDefConfig = {'max_cred_num': 5, 'issuance_type': 'ISSUANCE_ON_DEMAND'}
+        await indy.issuerCreateAndStoreRevocReg(walletHandle, trustAnchorDid, null, 'REG1', credDefId, rvocRegDefConfig, tailsWriterHandle)
         log('revoc reg 블록체인 등록 요청 생성')
         // const revocRequest = await indy.buildRevocRegDefRequest(trustAnchorDid, revocRegDef)
         // log('revoc reg 블록체인에 등록 요청 실행')
@@ -133,9 +142,78 @@ function makeRevokeRegistry(){
     })
 }
 
+function makeEnteranceVC(){
+    return new Promise(async(resolve, reject)=>{
+        log('enterance VC 생성...')
+        
+        log('alice의 지갑 생성...')
+        let aliceWalletName = {'id': 'aliceWallet'}
+        let aliceWalletCredentials = {'key': 'alice_key'}
+        await indy.createWallet(aliceWalletName, aliceWalletCredentials).catch(()=>{})
+
+        log('alice의 지갑 열기...')
+        const aliceWalletHandle = await indy.openWallet(aliceWalletName, aliceWalletCredentials)
+
+        log('alice의 DID, 인증키 생성...')
+        const [aliceDID, aliceVerKey] = await indy.createAndStoreMyDid(aliceWalletHandle, "{}")
+
+        logValue('alice DID: ', aliceDID)
+        logValue('alice Verkey: ', aliceVerKey)
+
+        log('credential offer 생성...')
+        const credOffer = await indy.issuerCreateCredentialOffer(walletHandle, credDefId);
+
+        log('Schema Request 생성...')
+        const getSchemaRequest = await indy.buildGetSchemaRequest(aliceDID, credOffer.schema_id)
+
+        log('Schema Request 실행...')
+        const getSchemaResponse = await indy.submitRequest(poolHandle, getSchemaRequest)
+
+        log('Schema parsing...')
+        const schema = await indy.parseGetSchemaResponse(getSchemaResponse)
+
+        log('Credential Definition Request 생성...')
+        const getCredDefRequest = await indy.buildGetCredDefRequest(aliceDID, credDefId)
+        
+        log('Credential Definition Request 실행...')
+        const getCredDefResponse = await indy.submitRequest(poolHandle, getCredDefRequest)
+
+        log('Credential Definition Response 확인 후 CredDef 꺼내기...')
+        const [_credDefId, _credDef] = await indy.parseGetCredDefResponse(getCredDefResponse)
+        
+        log('alice의 MasterSecret 생성...')
+        const aliceMasterSecret = await indy.proverCreateMasterSecret(aliceWalletHandle, undefined)
+
+        log('VC 발급 요청')
+        const [credReq, credReqMetaData] = await indy.proverCreateCredentialReq(aliceWalletHandle, aliceDID, credOffer, _credDef, aliceMasterSecret)
+        
+        // ---------------------이제 연구실에서 VC를 발급해줄 차례 --------------------------
+        const VC_DATA = {
+            passLevel: '3',
+            lastName: 'Kang', 
+            firstName: 'Sung Hwan'
+        }
+        
+        
+        for (const [key, value] of Object.entries(VC_DATA)){
+            const encoded = await util.encode(value)
+            VC_DATA[key] = {raw: value, encoded: encoded[0]}
+        }
+
+        log('연구실에서 alice VC 발급중...')
+        const [cred, _, __] = await indy.issuerCreateCredential(walletHandle, credOffer, credReq, VC_DATA, null, -1)
+        
+        log('alice가 발급받은 VC를 자신의 지갑에 저장하는 중...')
+        const outCreDID = await indy.proverStoreCredential(aliceWalletHandle, null, credReqMetaData, cred, _credDef, null)
+        // log(outCreDID)
+        
+        log('VC 발급 완료')
+        resolve(cred)
+    })
+}
 
 
 
 
 
-module.exports = {getDID, makeSchema, makeCredential, makeRevokeRegistry}
+module.exports = {getDID, makeSchema, makeCredential, makeRevokeRegistry, makeEnteranceVC}
